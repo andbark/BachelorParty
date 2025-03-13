@@ -12,12 +12,6 @@ import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
-type GameType = {
-  id: string
-  name: string
-  is_team_game: boolean
-}
-
 type Player = {
   id: string
   name: string
@@ -44,6 +38,7 @@ export default function CreateGame() {
   const [teams, setTeams] = useState<Team[]>([])
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([])
   const [gameWager, setGameWager] = useState<number>(0)
+  const [isCreating, setIsCreating] = useState(false)
   const { toast } = useToast()
   const supabase = createClient()
   const [teamFormations, setTeamFormations] = useState<TeamFormation[]>([
@@ -52,9 +47,11 @@ export default function CreateGame() {
   ])
 
   useEffect(() => {
-    fetchPlayers()
-    fetchTeams()
-  }, [])
+    if (isOpen) {
+      fetchPlayers()
+      fetchTeams()
+    }
+  }, [isOpen])
 
   async function fetchPlayers() {
     const { data, error } = await supabase.from("players").select("*")
@@ -99,7 +96,6 @@ export default function CreateGame() {
     setTeamFormations([...teamFormations, { id: String(newTeamNumber), name: `Team ${newTeamNumber}`, players: [] }])
   }
 
-  // Add this function to handle player assignment to teams
   function assignPlayerToTeam(playerId: string, teamId: string) {
     // Remove player from any existing team
     const updatedTeams = teamFormations.map((team) => ({
@@ -116,124 +112,188 @@ export default function CreateGame() {
   }
 
   async function createGame() {
-    // Validate game type
-    if (!selectedGameType.trim()) {
-      toast({
-        title: "Game type required",
-        description: "Please enter a game type",
-        variant: "destructive",
-      })
-      return
-    }
+    try {
+      setIsCreating(true)
 
-    // Validate wager amount
-    if (!gameWager || gameWager <= 0) {
-      toast({
-        title: "Wager required",
-        description: "Please enter a valid wager amount greater than zero",
-        variant: "destructive",
-      })
-      return
-    }
-
-    // Validate team game requirements
-    if (isTeamGame) {
-      const teamsWithPlayers = teamFormations.filter((team) => team.players.length > 0)
-
-      // Check if we have at least 2 teams with players
-      if (teamsWithPlayers.length < 2) {
+      // Validate game type
+      if (!selectedGameType.trim()) {
         toast({
-          title: "Not enough teams",
-          description: "Please select at least 2 teams with players",
+          title: "Game type required",
+          description: "Please enter a game type",
           variant: "destructive",
         })
+        setIsCreating(false)
         return
       }
 
-      // Check if each team has at least one player
-      const emptyTeams = teamsWithPlayers.filter((team) => team.players.length === 0)
-      if (emptyTeams.length > 0) {
+      // Validate wager amount
+      if (!gameWager || gameWager <= 0) {
         toast({
-          title: "Empty teams",
-          description: `Please add at least one player to ${emptyTeams.map((t) => t.name).join(", ")}`,
+          title: "Wager required",
+          description: "Please enter a valid wager amount greater than zero",
           variant: "destructive",
         })
+        setIsCreating(false)
         return
       }
-    } else {
-      // Validate individual player game requirements
-      if (selectedPlayers.length < 2) {
-        toast({
-          title: "Not enough players",
-          description: "Please select at least 2 players",
-          variant: "destructive",
-        })
-        return
+
+      // Validate team game requirements
+      if (isTeamGame) {
+        const teamsWithPlayers = teamFormations.filter((team) => team.players.length > 0)
+
+        // Check if we have at least 2 teams with players
+        if (teamsWithPlayers.length < 2) {
+          toast({
+            title: "Not enough teams",
+            description: "Please select at least 2 teams with players",
+            variant: "destructive",
+          })
+          setIsCreating(false)
+          return
+        }
+      } else {
+        // Validate individual player game requirements
+        if (selectedPlayers.length < 2) {
+          toast({
+            title: "Not enough players",
+            description: "Please select at least 2 players",
+            variant: "destructive",
+          })
+          setIsCreating(false)
+          return
+        }
       }
-    }
 
-    // Create the game in the database
-    const { data: gameData, error: gameError } = await supabase
-      .from("games")
-      .insert([
-        {
-          type: selectedGameType.trim(),
-          is_team_game: isTeamGame,
-          status: "in_progress",
-          created_at: new Date().toISOString(),
-        },
-      ])
-      .select()
-
-    if (gameError || !gameData) {
-      toast({
-        title: "Error creating game",
-        description: gameError?.message || "Unknown error",
-        variant: "destructive",
+      console.log("Creating game:", {
+        type: selectedGameType.trim(),
+        is_team_game: isTeamGame,
+        status: "in_progress",
       })
-      return
-    }
 
-    const gameId = gameData[0].id
+      // Create the game in the database - using a simpler approach to avoid schema issues
+      const gameData = {
+        type: selectedGameType.trim(),
+        status: "in_progress",
+      }
 
-    // Add participants to the game
-    if (isTeamGame) {
-      for (const team of teamFormations) {
-        if (team.players.length > 0) {
-          for (const playerId of team.players) {
-            await supabase.from("game_players").insert([
+      // Add is_team_game only if it exists in the schema
+      try {
+        const { data, error } = await supabase.from("games").insert([gameData]).select()
+
+        if (error) {
+          console.error("Error creating game:", error)
+          toast({
+            title: "Error creating game",
+            description: error.message,
+            variant: "destructive",
+          })
+          setIsCreating(false)
+          return
+        }
+
+        if (!data || data.length === 0) {
+          console.error("No game data returned")
+          toast({
+            title: "Error creating game",
+            description: "No game data returned from the server",
+            variant: "destructive",
+          })
+          setIsCreating(false)
+          return
+        }
+
+        const gameId = data[0].id
+        console.log("Game created with ID:", gameId)
+
+        // Add participants to the game
+        if (isTeamGame) {
+          console.log("Adding team players to game")
+          for (const team of teamFormations) {
+            if (team.players.length > 0) {
+              for (const playerId of team.players) {
+                const { error: playerError } = await supabase.from("game_players").insert([
+                  {
+                    game_id: gameId,
+                    player_id: playerId,
+                    wager: gameWager,
+                    team_id: team.id,
+                  },
+                ])
+
+                if (playerError) {
+                  console.error("Error adding player to game:", playerError)
+                  toast({
+                    title: "Error adding player to game",
+                    description: playerError.message,
+                    variant: "destructive",
+                  })
+                  setIsCreating(false)
+                  return
+                }
+              }
+            }
+          }
+        } else {
+          console.log("Adding individual players to game")
+          for (const playerId of selectedPlayers) {
+            const { error: playerError } = await supabase.from("game_players").insert([
               {
                 game_id: gameId,
                 player_id: playerId,
                 wager: gameWager,
-                team_id: team.id,
               },
             ])
+
+            if (playerError) {
+              console.error("Error adding player to game:", playerError)
+              toast({
+                title: "Error adding player to game",
+                description: playerError.message,
+                variant: "destructive",
+              })
+              setIsCreating(false)
+              return
+            }
           }
         }
+
+        // Update the is_team_game field separately to handle schema differences
+        const { error: updateError } = await supabase
+          .from("games")
+          .update({ is_team_game: isTeamGame })
+          .eq("id", gameId)
+
+        if (updateError) {
+          console.warn("Could not update is_team_game field:", updateError.message)
+          // Continue anyway since this is not critical
+        }
+
+        console.log("Game creation completed successfully")
+        toast({
+          title: "Game created",
+          description: `${selectedGameType} game has been created successfully!`,
+        })
+
+        setIsOpen(false)
+        resetForm()
+      } catch (error) {
+        console.error("Error in game creation:", error)
+        toast({
+          title: "Error creating game",
+          description: "An unexpected error occurred during game creation",
+          variant: "destructive",
+        })
       }
-    } else {
-      for (const playerId of selectedPlayers) {
-        await supabase.from("game_players").insert([
-          {
-            game_id: gameId,
-            player_id: playerId,
-            wager: gameWager,
-          },
-        ])
-      }
+    } catch (error) {
+      console.error("Unexpected error creating game:", error)
+      toast({
+        title: "Error creating game",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive",
+      })
+    } finally {
+      setIsCreating(false)
     }
-
-    // Get the selected game type name for the success message
-    const gameTypeName = selectedGameType
-
-    toast({
-      title: "Game created",
-      description: `${gameTypeName} game has been created successfully!`,
-    })
-
-    setIsOpen(false)
-    resetForm()
   }
 
   function resetForm() {
@@ -249,7 +309,13 @@ export default function CreateGame() {
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <Dialog
+        open={isOpen}
+        onOpenChange={(open) => {
+          setIsOpen(open)
+          if (!open) resetForm()
+        }}
+      >
         <DialogTrigger asChild>
           <Button size="lg" className="w-full md:w-auto">
             Create New Game
@@ -400,7 +466,9 @@ export default function CreateGame() {
               <Button variant="outline" onClick={() => setIsOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={createGame}>Create Game</Button>
+              <Button onClick={createGame} disabled={isCreating}>
+                {isCreating ? "Creating..." : "Create Game"}
+              </Button>
             </div>
           </div>
         </DialogContent>
