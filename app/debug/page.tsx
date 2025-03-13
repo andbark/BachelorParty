@@ -1,94 +1,116 @@
-import { createClient } from '@/lib/supabase'
+"use client"
 
-export default async function DebugPage() {
-  let supabaseStatus = "Not initialized";
-  let tablesInfo = [];
-  
-  try {
-    const supabase = createClient();
-    
-    if (!supabase) {
-      supabaseStatus = "Failed to initialize - check environment variables";
-    } else {
-      supabaseStatus = "Initialized successfully";
-      
-      // Test connection by listing tables
-      const { data, error } = await supabase.from('games').select('count');
-      
-      if (error) {
-        tablesInfo.push(`Error accessing 'games' table: ${error.message}`);
-      } else {
-        tablesInfo.push(`'games' table accessible: ${data ? JSON.stringify(data) : 'No data'}`);
+import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+
+export default function DebugPage() {
+  const [dbStatus, setDbStatus] = useState<"checking" | "connected" | "error">("checking")
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [envVars, setEnvVars] = useState<{ [key: string]: boolean }>({})
+
+  useEffect(() => {
+    // Check if environment variables are set
+    const checkEnvVars = () => {
+      const vars = {
+        NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       }
-      
-      const { data: playersData, error: playersError } = await supabase.from('players').select('count');
-      
-      if (playersError) {
-        tablesInfo.push(`Error accessing 'players' table: ${playersError.message}`);
-      } else {
-        tablesInfo.push(`'players' table accessible: ${playersData ? JSON.stringify(playersData) : 'No data'}`);
+      setEnvVars(vars)
+    }
+
+    // Check database connection
+    const checkDbConnection = async () => {
+      try {
+        const { data, error } = await supabase.from("games").select("count").limit(1)
+
+        if (error) {
+          setDbStatus("error")
+          setErrorMessage(error.message)
+        } else {
+          setDbStatus("connected")
+        }
+      } catch (err) {
+        setDbStatus("error")
+        setErrorMessage(err instanceof Error ? err.message : "Unknown error")
       }
     }
-  } catch (error) {
-    supabaseStatus = `Error: ${error instanceof Error ? error.message : "Unknown error"}`;
-  }
 
-  // Safely get environment variable values
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+    checkEnvVars()
+    checkDbConnection()
+  }, [])
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Debug Page</h1>
-      <p className="mb-6">If you can see this, your app is rendering correctly.</p>
-      
-      <div className="mb-6 p-4 border rounded-md bg-gray-50">
-        <h2 className="text-xl font-semibold mb-2">Environment Variables</h2>
-        <ul className="list-disc pl-6">
-          <li>
-            NEXT_PUBLIC_SUPABASE_URL: {supabaseUrl ? 'Set ✅' : 'Not set ❌'}
-            {supabaseUrl && 
-              <span className="ml-2 text-gray-500">
-                ({supabaseUrl.substring(0, 15)}...)
-              </span>
-            }
-          </li>
-          <li>
-            NEXT_PUBLIC_SUPABASE_ANON_KEY: {supabaseAnonKey ? 'Set ✅' : 'Not set ❌'}
-            {supabaseAnonKey && 
-              <span className="ml-2 text-gray-500">
-                ({supabaseAnonKey.substring(0, 5)}...)
-              </span>
-            }
-          </li>
-        </ul>
-      </div>
-      
-      <div className="mb-6 p-4 border rounded-md bg-gray-50">
-        <h2 className="text-xl font-semibold mb-2">Supabase Status</h2>
-        <p className={supabaseStatus.includes("Error") ? "text-red-600" : "text-green-600"}>
-          {supabaseStatus}
-        </p>
-        
-        {tablesInfo.length > 0 && (
-          <div className="mt-4">
-            <h3 className="font-semibold">Database Tables:</h3>
-            <ul className="list-disc pl-6 mt-2">
-              {tablesInfo.map((info, index) => (
-                <li key={index} className={info.includes("Error") ? "text-red-600" : "text-green-600"}>
-                  {info}
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-6">Bachelor Party Tracker Debug</h1>
+
+      <div className="grid gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Environment Variables</CardTitle>
+            <CardDescription>Checking if required environment variables are set</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {Object.entries(envVars).map(([key, isSet]) => (
+                <li key={key} className="flex items-center gap-2">
+                  <span className={`inline-block w-4 h-4 rounded-full ${isSet ? "bg-green-500" : "bg-red-500"}`}></span>
+                  <span>
+                    {key}: {isSet ? "Set" : "Not Set"}
+                  </span>
                 </li>
               ))}
             </ul>
-          </div>
-        )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Database Connection</CardTitle>
+            <CardDescription>Testing connection to Supabase</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              {dbStatus === "checking" && (
+                <>
+                  <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                  <span>Checking connection...</span>
+                </>
+              )}
+
+              {dbStatus === "connected" && (
+                <>
+                  <span className="inline-block w-4 h-4 rounded-full bg-green-500"></span>
+                  <span>Connected to database</span>
+                </>
+              )}
+
+              {dbStatus === "error" && (
+                <>
+                  <span className="inline-block w-4 h-4 rounded-full bg-red-500"></span>
+                  <span>Error connecting to database</span>
+                </>
+              )}
+            </div>
+
+            {errorMessage && (
+              <div className="mt-4 p-3 bg-red-100 text-red-800 rounded">
+                <p className="font-semibold">Error:</p>
+                <p className="text-sm">{errorMessage}</p>
+              </div>
+            )}
+          </CardContent>
+          <CardFooter>
+            <Button onClick={() => window.location.reload()}>Refresh Tests</Button>
+          </CardFooter>
+        </Card>
       </div>
-      
-      <div className="mt-6">
-        <a href="/" className="text-blue-500 underline">
-          Back to Home Page
-        </a>
-      </div>
+    </div>
+  )
+}
+
+
     </div>
   )
 }
