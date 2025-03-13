@@ -1,8 +1,8 @@
 "use client"
 
 import { Wallet } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
-import { useGameStore } from "../lib/store"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card"
+import { useGameStore } from "../../lib/store"
 
 export function PlayerBalances() {
   const players = useGameStore((state) => state.players)
