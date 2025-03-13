@@ -1,46 +1,60 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { UserIcon, Dice1Icon as DiceIcon, TrophyIcon, SunIcon, MoonIcon } from "lucide-react"
-import { useTheme } from "next-themes"
+import { ModeToggle } from "@/components/theme-provider"
+import { Beer, Users, Trophy, History } from "lucide-react"
 
-export function SiteHeader() {
-  const { theme, setTheme } = useTheme()
+export default function SiteHeader() {
+  const [activeTab, setActiveTab] = useState("dashboard")
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center">
         <div className="mr-4 flex">
           <Link href="/" className="flex items-center space-x-2">
-            <span className="font-bold text-lg">Bachelor Party Tracker</span>
+            <Beer className="h-6 w-6" />
+            <span className="font-bold hidden md:inline-block">Bachelor Party Tracker</span>
           </Link>
         </div>
-        <nav className="flex items-center space-x-4 lg:space-x-6 ml-auto">
-          <Button variant="ghost" asChild>
-            <Link href="/players" className="flex items-center">
-              <UserIcon className="h-4 w-4 mr-2" />
-              <span>Players</span>
-            </Link>
+        <nav className="flex items-center space-x-4 lg:space-x-6 mx-6">
+          <Button
+            variant="ghost"
+            className="text-sm font-medium transition-colors hover:text-primary"
+            onClick={() => setActiveTab("dashboard")}
+          >
+            <Users className="h-4 w-4 mr-2" />
+            <span className="hidden md:inline-block">Players</span>
           </Button>
-          <Button variant="ghost" asChild>
-            <Link href="/games" className="flex items-center">
-              <DiceIcon className="h-4 w-4 mr-2" />
-              <span>Games</span>
-            </Link>
+          <Button
+            variant="ghost"
+            className="text-sm font-medium transition-colors hover:text-primary"
+            onClick={() => setActiveTab("games")}
+          >
+            <Beer className="h-4 w-4 mr-2" />
+            <span className="hidden md:inline-block">Games</span>
           </Button>
-          <Button variant="ghost" asChild>
-            <Link href="/leaderboard" className="flex items-center">
-              <TrophyIcon className="h-4 w-4 mr-2" />
-              <span>Leaderboard</span>
-            </Link>
+          <Button
+            variant="ghost"
+            className="text-sm font-medium transition-colors hover:text-primary"
+            onClick={() => setActiveTab("leaderboard")}
+          >
+            <Trophy className="h-4 w-4 mr-2" />
+            <span className="hidden md:inline-block">Leaderboard</span>
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
-            <SunIcon className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-            <MoonIcon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-            <span className="sr-only">Toggle theme</span>
+          <Button
+            variant="ghost"
+            className="text-sm font-medium transition-colors hover:text-primary"
+            onClick={() => setActiveTab("history")}
+          >
+            <History className="h-4 w-4 mr-2" />
+            <span className="hidden md:inline-block">History</span>
           </Button>
         </nav>
+        <div className="ml-auto flex items-center space-x-4">
+          <ModeToggle />
+        </div>
       </div>
     </header>
   )
