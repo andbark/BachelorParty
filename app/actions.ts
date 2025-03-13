@@ -245,3 +245,63 @@ export async function deleteGame(gameId: string) {
     return { success: false, error: 'Failed to delete game' }
   }
 }
+export async function updateGame(gameId: string, formData: FormData) {
+  try {
+    const gameIdInt = parseInt(gameId)
+    if (isNaN(gameIdInt)) {
+      return { success: false, error: 'Invalid game ID' }
+    }
+
+    const name = formData.get('name') as string
+    const description = formData.get('description') as string
+    const points = parseInt(formData.get('points') as string) || 0
+    
+    console.log('Updating game:', { gameId, name, description, points })
+    
+    const { data, error } = await supabase
+      .from('games')
+      .update({ name, description, points })
+      .eq('id', gameIdInt)
+      .select()
+    
+    if (error) {
+      console.error('Error updating game:', error)
+      return { success: false, error: error.message }
+    }
+    
+    console.log('Game updated successfully:', data)
+    revalidatePath('/')
+    return { success: true, data }
+  } catch (error) {
+    console.error('Exception in updateGame:', error)
+    return { success: false, error: 'Failed to update game' }
+  }
+}
+
+export async function deleteGame(gameId: string) {
+  try {
+    const gameIdInt = parseInt(gameId)
+    if (isNaN(gameIdInt)) {
+      return { success: false, error: 'Invalid game ID' }
+    }
+    
+    console.log('Deleting game:', gameId)
+    
+    const { error } = await supabase
+      .from('games')
+      .delete()
+      .eq('id', gameIdInt)
+    
+    if (error) {
+      console.error('Error deleting game:', error)
+      return { success: false, error: error.message }
+    }
+    
+    console.log('Game deleted successfully')
+    revalidatePath('/')
+    return { success: true }
+  } catch (error) {
+    console.error('Exception in deleteGame:', error)
+    return { success: false, error: 'Failed to delete game' }
+  }
+}
