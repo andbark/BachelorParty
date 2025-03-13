@@ -1,15 +1,34 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useTheme as useNextTheme } from "next-themes"
+import * as React from "react"
+import { ThemeProvider as NextThemesProvider } from "next-themes"
+import type { ThemeProviderProps } from "next-themes"
 import { Switch } from "@/components/ui/switch"
-import { Moon, Sun } from "lucide-react"
+import { Label } from "@/components/ui/label"
+import { MoonIcon, SunIcon } from "lucide-react"
 
-export function ModeToggle() {
-  const { setTheme, resolvedTheme } = useNextTheme()
-  const [mounted, setMounted] = useState(false)
+export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
+  const [mounted, setMounted] = React.useState(false)
+  const { theme, setTheme } = props
 
-  useEffect(() => {
+  // useEffect only runs on the client, so now we can safely show the UI
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return null
+  }
+
+  return <NextThemesProvider {...props}>{children}</NextThemesProvider>
+}
+
+export function ThemeToggle() {
+  const [mounted, setMounted] = React.useState(false)
+  const { theme, setTheme } = React.useContext(NextThemesProvider.Context)
+
+  // useEffect only runs on the client, so now we can safely show the UI
+  React.useEffect(() => {
     setMounted(true)
   }, [])
 
@@ -18,14 +37,17 @@ export function ModeToggle() {
   }
 
   return (
-    <Switch
-      checked={resolvedTheme === "dark"}
-      onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
-      className="peer h-5 w-9 rounded-full bg-secondary outline-none ring-offset-background data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors data-[state=checked]:peer-focus-visible:ring-primary"
-    >
-      <Sun className="absolute h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-      <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-      <span className="sr-only">Toggle dark mode</span>
-    </Switch>
+    <div className="flex items-center space-x-2">
+      <SunIcon className="h-4 w-4" />
+      <Switch
+        id="theme-toggle"
+        checked={theme === "dark"}
+        onCheckedChange={() => setTheme(theme === "dark" ? "light" : "dark")}
+      />
+      <MoonIcon className="h-4 w-4" />
+      <Label htmlFor="theme-toggle" className="sr-only">
+        Toggle theme
+      </Label>
+    </div>
   )
 }
