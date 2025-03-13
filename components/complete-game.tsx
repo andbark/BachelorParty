@@ -23,21 +23,21 @@ type GamePlayer = {
   player_id: string
   player_name: string
   wager: number
+  team_id?: string
 }
 
-type GameTeam = {
+type TeamInfo = {
   id: string
-  game_id: string
-  team_id: string
-  team_name: string
-  wager: number
+  name: string
+  players: GamePlayer[]
+  totalWager: number
 }
 
 export default function CompleteGame() {
   const [activeGames, setActiveGames] = useState<Game[]>([])
   const [selectedGame, setSelectedGame] = useState<Game | null>(null)
   const [gamePlayers, setGamePlayers] = useState<GamePlayer[]>([])
-  const [gameTeams, setGameTeams] = useState<GameTeam[]>([])
+  const [teams, setTeams] = useState<TeamInfo[]>([])
   const [winnerId, setWinnerId] = useState<string>("")
   const [isOpen, setIsOpen] = useState(false)
   const { toast } = useToast()
@@ -49,11 +49,7 @@ export default function CompleteGame() {
 
   useEffect(() => {
     if (selectedGame) {
-      if (selectedGame.is_team_game) {
-        fetchGameTeams(selectedGame.id)
-      } else {
-        fetchGamePlayers(selectedGame.id)
-      }
+      fetchGamePlayers(selectedGame.id)
     }
   }, [selectedGame])
 
@@ -80,7 +76,8 @@ export default function CompleteGame() {
         game_id,
         player_id,
         players(name),
-        wager
+        wager,
+        team_id
       `)
       .eq("game_id", gameId)
 
@@ -100,44 +97,36 @@ export default function CompleteGame() {
         player_id: item.player_id,
         player_name: item.players.name,
         wager: item.wager,
+        team_id: item.team_id,
       })) || []
 
     setGamePlayers(formattedPlayers)
-    setGameTeams([])
-  }
 
-  async function fetchGameTeams(gameId: string) {
-    const { data, error } = await supabase
-      .from("game_teams")
-      .select(`
-        id,
-        game_id,
-        team_id,
-        teams(name),
-        wager
-      `)
-      .eq("game_id", gameId)
+    // If it's a team game, organize players by team
+    if (selectedGame?.is_team_game) {
+      const teamMap = new Map<string, TeamInfo>()
 
-    if (error) {
-      toast({
-        title: "Error fetching game teams",
-        description: error.message,
-        variant: "destructive",
+      formattedPlayers.forEach((player) => {
+        if (player.team_id) {
+          if (!teamMap.has(player.team_id)) {
+            teamMap.set(player.team_id, {
+              id: player.team_id,
+              name: `Team ${player.team_id}`,
+              players: [],
+              totalWager: 0,
+            })
+          }
+
+          const team = teamMap.get(player.team_id)!
+          team.players.push(player)
+          team.totalWager = player.wager // All players in a team have the same wager
+        }
       })
-      return
+
+      setTeams(Array.from(teamMap.values()))
+    } else {
+      setTeams([])
     }
-
-    const formattedTeams =
-      data?.map((item) => ({
-        id: item.id,
-        game_id: item.game_id,
-        team_id: item.team_id,
-        team_name: item.teams.name,
-        wager: item.wager,
-      })) || []
-
-    setGameTeams(formattedTeams)
-    setGamePlayers([])
   }
 
   async function completeGame() {
@@ -168,74 +157,51 @@ export default function CompleteGame() {
       // Create game history entry
       let winnerName = ""
       let totalWinnings = 0
-      let participants = []
+      let participants: string[] = []
 
       if (selectedGame.is_team_game) {
-        const winningTeam = gameTeams.find((t) => t.team_id === winnerId)
+        // Team game logic
+        const winningTeam = teams.find((t) => t.id === winnerId)
         if (!winningTeam) throw new Error("Winner not found")
 
-        winnerName = winningTeam.team_name
+        winnerName = winningTeam.name
 
         // Calculate total winnings (sum of all other teams' wagers)
-        const losingTeams = gameTeams.filter((t) => t.team_id !== winnerId)
-        totalWinnings = losingTeams.reduce((sum, team) => sum + team.wager, 0)
+        const losingTeams = teams.filter((t) => t.id !== winnerId)
+        totalWinnings = losingTeams.reduce((sum, team) => sum + team.totalWager * team.players.length, 0)
 
-        participants = gameTeams.map((t) => t.team_name)
+        // Get all participant names
+        participants = gamePlayers.map((p) => p.player_name)
 
-        // Update team stats
-        await supabase
-          .from("teams")
-          .update({ wins: supabase.rpc("increment", { inc: 1 }) })
-          .eq("id", winnerId)
+        // Calculate winnings per player in winning team
+        const winningsPerPlayer = totalWinnings / winningTeam.players.length
 
-        for (const team of losingTeams) {
+        // Update winning team players' balances
+        for (const player of winningTeam.players) {
           await supabase
-            .from("teams")
-            .update({ losses: supabase.rpc("increment", { inc: 1 }) })
-            .eq("id", team.team_id)
+            .from("players")
+            .update({
+              balance: supabase.rpc("increment", { inc: winningsPerPlayer }),
+              games_won: supabase.rpc("increment", { inc: 1 }),
+              games_played: supabase.rpc("increment", { inc: 1 }),
+            })
+            .eq("id", player.player_id)
         }
 
-        // Get team members to update their balances
-        const { data: winningTeamData } = await supabase.from("teams").select("members").eq("id", winnerId).single()
-
-        if (winningTeamData && winningTeamData.members) {
-          const splitWinnings = totalWinnings / winningTeamData.members.length
-
-          // Update each winning team member's balance
-          for (const memberId of winningTeamData.members) {
+        // Update losing team players' balances
+        for (const team of losingTeams) {
+          for (const player of team.players) {
             await supabase
               .from("players")
               .update({
-                balance: supabase.rpc("increment", { inc: splitWinnings }),
-                games_won: supabase.rpc("increment", { inc: 1 }),
+                balance: supabase.rpc("decrement", { dec: player.wager }),
+                games_played: supabase.rpc("increment", { inc: 1 }),
               })
-              .eq("id", memberId)
-          }
-        }
-
-        // Update losing team members' balances
-        for (const team of losingTeams) {
-          const { data: losingTeamData } = await supabase
-            .from("teams")
-            .select("members")
-            .eq("id", team.team_id)
-            .single()
-
-          if (losingTeamData && losingTeamData.members) {
-            const splitLosses = team.wager / losingTeamData.members.length
-
-            for (const memberId of losingTeamData.members) {
-              await supabase
-                .from("players")
-                .update({
-                  balance: supabase.rpc("decrement", { dec: splitLosses }),
-                  games_played: supabase.rpc("increment", { inc: 1 }),
-                })
-                .eq("id", memberId)
-            }
+              .eq("id", player.player_id)
           }
         }
       } else {
+        // Individual game logic
         const winningPlayer = gamePlayers.find((p) => p.player_id === winnerId)
         if (!winningPlayer) throw new Error("Winner not found")
 
@@ -308,7 +274,7 @@ export default function CompleteGame() {
   function resetForm() {
     setSelectedGame(null)
     setGamePlayers([])
-    setGameTeams([])
+    setTeams([])
     setWinnerId("")
   }
 
@@ -348,11 +314,11 @@ export default function CompleteGame() {
               <Label>Select Winner</Label>
               <RadioGroup value={winnerId} onValueChange={setWinnerId}>
                 {selectedGame.is_team_game
-                  ? gameTeams.map((team) => (
-                      <div key={team.team_id} className="flex items-center space-x-2 py-2">
-                        <RadioGroupItem value={team.team_id} id={`team-${team.team_id}`} />
-                        <Label htmlFor={`team-${team.team_id}`}>
-                          {team.team_name} (Wager: ${team.wager})
+                  ? teams.map((team) => (
+                      <div key={team.id} className="flex items-center space-x-2 py-2">
+                        <RadioGroupItem value={team.id} id={`team-${team.id}`} />
+                        <Label htmlFor={`team-${team.id}`}>
+                          {team.name} (Players: {team.players.map((p) => p.player_name).join(", ")})
                         </Label>
                       </div>
                     ))
@@ -381,4 +347,3 @@ export default function CompleteGame() {
     </Dialog>
   )
 }
-
