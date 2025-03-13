@@ -52,30 +52,30 @@ export default function GameManager() {
     fetchGames()
 
     // Subscribe to real-time updates
-    const channel = supabase.channel("custom-all-channel")
+    // const channel = supabase.channel("custom-all-channel")
 
-    channel
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "games",
-        },
-        () => {
-          console.log("Games table changed, refreshing...")
-          fetchGames()
-        },
-      )
-      .on("broadcast", { event: "game_created" }, () => {
-        console.log("New game created, refreshing...")
-        fetchGames()
-      })
-      .subscribe()
+    // channel
+    //   .on(
+    //     "postgres_changes",
+    //     {
+    //       event: "*",
+    //       schema: "public",
+    //       table: "games",
+    //     },
+    //     () => {
+    //       console.log("Games table changed, refreshing...")
+    //       fetchGames()
+    //     },
+    //   )
+    //   .on("broadcast", { event: "game_created" }, () => {
+    //     console.log("New game created, refreshing...")
+    //     fetchGames()
+    //   })
+    //   .subscribe()
 
-    return () => {
-      channel.unsubscribe()
-    }
+    // return () => {
+    //   channel.unsubscribe()
+    // }
   }, [])
 
   async function fetchGames() {
