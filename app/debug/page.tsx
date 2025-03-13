@@ -1,70 +1,93 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase'
 
 export default async function DebugPage() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  const supabase = createClient(supabaseUrl, supabaseKey)
-  
-  let tables = []
-  let error = null
-  let connectionStatus = 'Unknown'
+  let supabaseStatus = "Not initialized";
+  let tablesInfo = [];
   
   try {
-    // Test connection
-    const { data, error: connError } = await supabase.from('users').select('count').limit(1)
-    connectionStatus = connError ? 'Failed' : 'Connected'
+    const supabase = createClient();
     
-    // Get table info
-    const { data: tablesData, error: tablesError } = await supabase
-      .from('information_schema.tables')
-      .select('table_name')
-      .eq('table_schema', 'public')
-    
-    if (tablesError) {
-      error = tablesError.message
+    if (!supabase) {
+      supabaseStatus = "Failed to initialize - check environment variables";
     } else {
-      tables = tablesData || []
+      supabaseStatus = "Initialized successfully";
+      
+      // Test connection by listing tables
+      const { data, error } = await supabase.from('games').select('count');
+      
+      if (error) {
+        tablesInfo.push(`Error accessing 'games' table: ${error.message}`);
+      } else {
+        tablesInfo.push(`'games' table accessible: ${data ? JSON.stringify(data) : 'No data'}`);
+      }
+      
+      const { data: playersData, error: playersError } = await supabase.from('players').select('count');
+      
+      if (playersError) {
+        tablesInfo.push(`Error accessing 'players' table: ${playersError.message}`);
+      } else {
+        tablesInfo.push(`'players' table accessible: ${playersData ? JSON.stringify(playersData) : 'No data'}`);
+      }
     }
-  } catch (e: any) {
-    error = e.message
-    connectionStatus = 'Error'
+  } catch (error) {
+    supabaseStatus = `Error: ${error instanceof Error ? error.message : "Unknown error"}`;
   }
-  
+
+  // Safely get environment variable values
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
   return (
-    <div className="container mx-auto py-8 px-4">
-      <h1 className="text-3xl font-bold mb-6">Database Debug Information</h1>
+    <div className="p-8 max-w-4xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">Debug Page</h1>
+      <p className="mb-6">If you can see this, your app is rendering correctly.</p>
       
-      <div className="mb-6 p-4 border rounded-md">
-        <h2 className="text-xl font-semibold mb-2">Connection Status</h2>
-        <p className={`font-mono ${connectionStatus === 'Connected' ? 'text-green-600' : 'text-red-600'}`}>
-          {connectionStatus}
-        </p>
-      </div>
-      
-      <div className="mb-6 p-4 border rounded-md">
+      <div className="mb-6 p-4 border rounded-md bg-gray-50">
         <h2 className="text-xl font-semibold mb-2">Environment Variables</h2>
-        <p className="font-mono mb-1">NEXT_PUBLIC_SUPABASE_URL: {supabaseUrl ? '✓ Set' : '✗ Not Set'}</p>
-        <p className="font-mono">NEXT_PUBLIC_SUPABASE_ANON_KEY: {supabaseKey ? '✓ Set' : '✗ Not Set'}</p>
+        <ul className="list-disc pl-6">
+          <li>
+            NEXT_PUBLIC_SUPABASE_URL: {supabaseUrl ? 'Set ✅' : 'Not set ❌'}
+            {supabaseUrl && 
+              <span className="ml-2 text-gray-500">
+                ({supabaseUrl.substring(0, 15)}...)
+              </span>
+            }
+          </li>
+          <li>
+            NEXT_PUBLIC_SUPABASE_ANON_KEY: {supabaseAnonKey ? 'Set ✅' : 'Not set ❌'}
+            {supabaseAnonKey && 
+              <span className="ml-2 text-gray-500">
+                ({supabaseAnonKey.substring(0, 5)}...)
+              </span>
+            }
+          </li>
+        </ul>
       </div>
       
-      {error && (
-        <div className="mb-6 p-4 border border-red-300 bg-red-50 rounded-md">
-          <h2 className="text-xl font-semibold mb-2 text-red-700">Error</h2>
-          <p className="font-mono text-red-700">{error}</p>
-        </div>
-      )}
-      
-      <div className="p-4 border rounded-md">
-        <h2 className="text-xl font-semibold mb-2">Tables</h2>
-        {tables.length > 0 ? (
-          <ul className="list-disc pl-5">
-            {tables.map((table: any) => (
-              <li key={table.table_name} className="font-mono">{table.table_name}</li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-gray-500">No tables found or unable to retrieve table information.</p>
+      <div className="mb-6 p-4 border rounded-md bg-gray-50">
+        <h2 className="text-xl font-semibold mb-2">Supabase Status</h2>
+        <p className={supabaseStatus.includes("Error") ? "text-red-600" : "text-green-600"}>
+          {supabaseStatus}
+        </p>
+        
+        {tablesInfo.length > 0 && (
+          <div className="mt-4">
+            <h3 className="font-semibold">Database Tables:</h3>
+            <ul className="list-disc pl-6 mt-2">
+              {tablesInfo.map((info, index) => (
+                <li key={index} className={info.includes("Error") ? "text-red-600" : "text-green-600"}>
+                  {info}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
+      </div>
+      
+      <div className="mt-6">
+        <a href="/" className="text-blue-500 underline">
+          Back to Home Page
+        </a>
       </div>
     </div>
   )
