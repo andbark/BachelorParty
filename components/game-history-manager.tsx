@@ -128,6 +128,8 @@ export default function GameHistoryManager() {
         </AlertDescription>
       </Alert>
 
+      <Button onClick={fetchGameHistory}>Refresh History</Button>
+
       {history.length === 0 ? (
         <p className="text-center text-muted-foreground py-4">No game history found</p>
       ) : (
