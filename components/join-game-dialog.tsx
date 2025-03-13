@@ -40,8 +40,8 @@ interface JoinGameDialogProps {
 export function JoinGameDialog({ 
   open, 
   onOpenChange, 
-  players = [], // Default to empty array if undefined
-  games = []    // Default to empty array if undefined
+  players = [], 
+  games = []    
 }: JoinGameDialogProps) {
   const [selectedGame, setSelectedGame] = useState<string>('')
   const [selectedPlayer, setSelectedPlayer] = useState<string>('')
@@ -86,7 +86,6 @@ export function JoinGameDialog({
     }
   }
 
-  // Check if we have any games or players to display
   const hasGames = Array.isArray(games) && games.length > 0
   const hasPlayers = Array.isArray(players) && players.length > 0
 
