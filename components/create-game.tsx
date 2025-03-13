@@ -46,6 +46,24 @@ export default function CreateGame() {
     { id: "2", name: "Team 2", players: [] },
   ])
 
+  async function refreshGames() {
+    const { data, error } = await supabase.from("games").select("*").eq("status", "in_progress")
+    if (error) {
+      console.error("Error refreshing games:", error)
+      toast({
+        title: "Error refreshing games",
+        description: error.message,
+        variant: "destructive",
+      })
+      return
+    }
+    console.log("Games refreshed:", data)
+    toast({
+      title: "Games refreshed",
+      description: `Found ${data.length} active games`,
+    })
+  }
+
   useEffect(() => {
     if (isOpen) {
       fetchPlayers()
@@ -218,20 +236,34 @@ export default function CreateGame() {
           }
         }
 
-        console.log("Game creation completed successfully")
-        toast({
-          title: "Game created",
-          description: `${selectedGameType} game has been created successfully!`,
-        })
+        console.log("Game creation completed successfully with ID:", gameId)
+
+        // Add console logs to help debug
+        console.log("Game created successfully with ID:", gameId)
+        console.log("Selected players:", selectedPlayers)
+        console.log("Team game:", isTeamGame)
+        console.log("Team formations:", teamFormations)
 
         // Manually trigger a refresh of the games list
         const channel = supabase.channel("custom-all-channel")
         await channel.subscribe()
+        console.log("Broadcasting game_created event")
         await channel.send({
           type: "broadcast",
           event: "game_created",
           payload: { gameId },
         })
+
+        // Add a small delay before closing the dialog to ensure the broadcast is sent
+        await new Promise((resolve) => setTimeout(resolve, 500))
+
+        // Add a direct fetch to update the UI immediately
+        try {
+          const { data: games } = await supabase.from("games").select("*").eq("id", gameId)
+          console.log("Fetched newly created game:", games)
+        } catch (error) {
+          console.error("Error fetching new game:", error)
+        }
 
         setIsOpen(false)
         resetForm()
