@@ -1,14 +1,11 @@
 "use client"
 
-import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ModeToggle } from "@/components/theme-provider"
 import { Beer, Users, Trophy, History } from "lucide-react"
 
 export default function SiteHeader() {
-  const [activeTab, setActiveTab] = useState("dashboard")
-
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center">
@@ -22,7 +19,9 @@ export default function SiteHeader() {
           <Button
             variant="ghost"
             className="text-sm font-medium transition-colors hover:text-primary"
-            onClick={() => setActiveTab("dashboard")}
+            onClick={() => {
+              document.getElementById("players")?.scrollIntoView({ behavior: "smooth" })
+            }}
           >
             <Users className="h-4 w-4 mr-2" />
             <span className="hidden md:inline-block">Players</span>
@@ -30,15 +29,19 @@ export default function SiteHeader() {
           <Button
             variant="ghost"
             className="text-sm font-medium transition-colors hover:text-primary"
-            onClick={() => setActiveTab("games")}
+            onClick={() => {
+              document.getElementById("teams")?.scrollIntoView({ behavior: "smooth" })
+            }}
           >
             <Beer className="h-4 w-4 mr-2" />
-            <span className="hidden md:inline-block">Games</span>
+            <span className="hidden md:inline-block">Teams</span>
           </Button>
           <Button
             variant="ghost"
             className="text-sm font-medium transition-colors hover:text-primary"
-            onClick={() => setActiveTab("leaderboard")}
+            onClick={() => {
+              document.getElementById("leaderboard")?.scrollIntoView({ behavior: "smooth" })
+            }}
           >
             <Trophy className="h-4 w-4 mr-2" />
             <span className="hidden md:inline-block">Leaderboard</span>
@@ -46,7 +49,9 @@ export default function SiteHeader() {
           <Button
             variant="ghost"
             className="text-sm font-medium transition-colors hover:text-primary"
-            onClick={() => setActiveTab("history")}
+            onClick={() => {
+              document.getElementById("history")?.scrollIntoView({ behavior: "smooth" })
+            }}
           >
             <History className="h-4 w-4 mr-2" />
             <span className="hidden md:inline-block">History</span>
