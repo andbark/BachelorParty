@@ -52,35 +52,39 @@ export default function GameManager() {
     fetchGames()
 
     // Subscribe to real-time updates
-    // const channel = supabase.channel("custom-all-channel")
+    const channel = supabase.channel("custom-all-channel")
 
-    // channel
-    //   .on(
-    //     "postgres_changes",
-    //     {
-    //       event: "*",
-    //       schema: "public",
-    //       table: "games",
-    //     },
-    //     () => {
-    //       console.log("Games table changed, refreshing...")
-    //       fetchGames()
-    //     },
-    //   )
-    //   .on("broadcast", { event: "game_created" }, () => {
-    //     console.log("New game created, refreshing...")
-    //     fetchGames()
-    //   })
-    //   .subscribe()
+    channel
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "games",
+        },
+        () => {
+          console.log("Games table changed, refreshing...")
+          fetchGames()
+        },
+      )
+      .on("broadcast", { event: "game_created" }, (payload) => {
+        console.log("New game created broadcast received:", payload)
+        fetchGames()
+      })
+      .subscribe((status) => {
+        console.log("Subscription status:", status)
+      })
 
-    // return () => {
-    //   channel.unsubscribe()
-    // }
+    return () => {
+      console.log("Unsubscribing from channel")
+      channel.unsubscribe()
+    }
   }, [])
 
   async function fetchGames() {
     setIsLoading(true)
     try {
+      console.log("Fetching active games...")
       const { data, error } = await supabase
         .from("games")
         .select("*")
@@ -88,6 +92,7 @@ export default function GameManager() {
         .order("created_at", { ascending: false })
 
       if (error) {
+        console.error("Error fetching games:", error)
         toast({
           title: "Error fetching games",
           description: error.message,
@@ -96,7 +101,7 @@ export default function GameManager() {
         return
       }
 
-      console.log("Active games:", data)
+      console.log("Active games fetched:", data)
       setGames(data || [])
     } catch (error) {
       console.error("Error fetching games:", error)
