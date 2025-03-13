@@ -318,16 +318,14 @@ export default function CompleteGame() {
                       <div key={team.id} className="flex items-center space-x-2 py-2">
                         <RadioGroupItem value={team.id} id={`team-${team.id}`} />
                         <Label htmlFor={`team-${team.id}`}>
-                          {team.name} (Players: {team.players.map((p) => p.player_name).join(", ")})
+                          {team.name} - {team.players.map((p) => p.player_name).join(", ")}
                         </Label>
                       </div>
                     ))
                   : gamePlayers.map((player) => (
                       <div key={player.player_id} className="flex items-center space-x-2 py-2">
                         <RadioGroupItem value={player.player_id} id={`player-${player.player_id}`} />
-                        <Label htmlFor={`player-${player.player_id}`}>
-                          {player.player_name} (Wager: ${player.wager})
-                        </Label>
+                        <Label htmlFor={`player-${player.player_id}`}>{player.player_name}</Label>
                       </div>
                     ))}
               </RadioGroup>
