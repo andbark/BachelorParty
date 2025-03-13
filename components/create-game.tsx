@@ -164,42 +164,21 @@ export default function CreateGame() {
         }
       }
 
-      console.log("Creating game:", {
-        type: selectedGameType.trim(),
-        is_team_game: isTeamGame,
-        status: "in_progress",
-      })
-
-      // Create the game in the database - using a simpler approach to avoid schema issues
+      // Create the game in the database
       const gameData = {
         type: selectedGameType.trim(),
         status: "in_progress",
+        is_team_game: isTeamGame,
       }
 
-      // Add is_team_game only if it exists in the schema
       try {
-        const { data, error } = await supabase.from("games").insert([gameData]).select()
+        // Create the game
+        const { data, error: gameError } = await supabase.from("games").insert([gameData]).select()
 
-        if (error) {
-          console.error("Error creating game:", error)
-          toast({
-            title: "Error creating game",
-            description: error.message,
-            variant: "destructive",
-          })
-          setIsCreating(false)
-          return
-        }
+        if (gameError) throw gameError
 
         if (!data || data.length === 0) {
-          console.error("No game data returned")
-          toast({
-            title: "Error creating game",
-            description: "No game data returned from the server",
-            variant: "destructive",
-          })
-          setIsCreating(false)
-          return
+          throw new Error("No game data returned from the server")
         }
 
         const gameId = data[0].id
@@ -220,16 +199,7 @@ export default function CreateGame() {
                   },
                 ])
 
-                if (playerError) {
-                  console.error("Error adding player to game:", playerError)
-                  toast({
-                    title: "Error adding player to game",
-                    description: playerError.message,
-                    variant: "destructive",
-                  })
-                  setIsCreating(false)
-                  return
-                }
+                if (playerError) throw playerError
               }
             }
           }
@@ -244,28 +214,8 @@ export default function CreateGame() {
               },
             ])
 
-            if (playerError) {
-              console.error("Error adding player to game:", playerError)
-              toast({
-                title: "Error adding player to game",
-                description: playerError.message,
-                variant: "destructive",
-              })
-              setIsCreating(false)
-              return
-            }
+            if (playerError) throw playerError
           }
-        }
-
-        // Update the is_team_game field separately to handle schema differences
-        const { error: updateError } = await supabase
-          .from("games")
-          .update({ is_team_game: isTeamGame })
-          .eq("id", gameId)
-
-        if (updateError) {
-          console.warn("Could not update is_team_game field:", updateError.message)
-          // Continue anyway since this is not critical
         }
 
         console.log("Game creation completed successfully")
@@ -274,18 +224,23 @@ export default function CreateGame() {
           description: `${selectedGameType} game has been created successfully!`,
         })
 
+        // Manually trigger a refresh of the games list
+        const channel = supabase.channel("custom-all-channel")
+        await channel.subscribe()
+        await channel.send({
+          type: "broadcast",
+          event: "game_created",
+          payload: { gameId },
+        })
+
         setIsOpen(false)
         resetForm()
       } catch (error) {
         console.error("Error in game creation:", error)
-        toast({
-          title: "Error creating game",
-          description: "An unexpected error occurred during game creation",
-          variant: "destructive",
-        })
+        throw error
       }
     } catch (error) {
-      console.error("Unexpected error creating game:", error)
+      console.error("Error creating game:", error)
       toast({
         title: "Error creating game",
         description: error instanceof Error ? error.message : "An unexpected error occurred",
