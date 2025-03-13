@@ -66,7 +66,7 @@ export default async function Page() {
                 <ul className="space-y-2">
                   {players.map(player => (
                     <li key={player.id} className="p-3 border rounded-md">
-                      {player.name} - ${player.balance}
+                      {player.name || 'Unnamed'} - ${player.balance || 0}
                     </li>
                   ))}
                 </ul>
@@ -81,7 +81,7 @@ export default async function Page() {
                 <ul className="space-y-2">
                   {games.map(game => (
                     <li key={game.id} className="p-3 border rounded-md">
-                      {game.name} - Buy-in: ${game.buy_in}
+                      {game.name || 'Unnamed'} - Buy-in: ${game.buy_in || 0}
                     </li>
                   ))}
                 </ul>
