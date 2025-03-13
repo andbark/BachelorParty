@@ -6,9 +6,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Settings } from "lucide-react"
-import PlayerManager from "./admin/player-manager"
-import GameManager from "./admin/game-manager"
-import GameHistoryManager from "./admin/game-history-manager"
+import PlayerManager from "./player-manager"
+import GameManager from "./game-manager"
+import GameHistoryManager from "./game-history-manager"
 
 export default function AdminPanel() {
   const [isOpen, setIsOpen] = useState(false)
