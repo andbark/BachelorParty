@@ -4,6 +4,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ModeToggle } from "@/components/theme-provider"
 import { Beer, Users, Trophy, History } from "lucide-react"
+import AdminPanel from "./admin-panel"
 
 export default function SiteHeader() {
   return (
@@ -58,6 +59,7 @@ export default function SiteHeader() {
           </Button>
         </nav>
         <div className="ml-auto flex items-center space-x-4">
+          <AdminPanel />
           <ModeToggle />
         </div>
       </div>
