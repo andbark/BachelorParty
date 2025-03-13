@@ -3,7 +3,6 @@
 import { useEffect } from "react"
 import { createClient } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
-import { subscribeToPlayers, subscribeToGames, subscribeToGameHistory, subscribeToTeams } from "@/lib/realtime"
 
 // Import components
 import PlayerBalances from "@/components/playerbalances"
@@ -14,46 +13,106 @@ import SiteHeader from "@/components/site-header"
 import CreateGame from "@/components/create-game"
 import CompleteGame from "@/components/complete-game"
 
+// Import the debug panel
+import DebugPanel from "@/components/debug-panel"
+
 export default function Home() {
   const { toast } = useToast()
   const supabase = createClient()
 
   useEffect(() => {
     // Subscribe to real-time updates
-    const playersSubscription = subscribeToPlayers(() => {
+    console.log("Setting up real-time subscriptions...")
+
+    // Create a single channel for all subscriptions
+    const channel = supabase.channel("custom-all-channel")
+
+    // Set up subscription for players
+    channel.on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "players",
+      },
+      () => {
+        console.log("Players updated")
+        toast({
+          title: "Players updated",
+          description: "Player data has been updated in real-time",
+        })
+      },
+    )
+
+    // Set up subscription for games
+    channel.on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "games",
+      },
+      () => {
+        console.log("Games updated")
+        toast({
+          title: "Games updated",
+          description: "Game data has been updated in real-time",
+        })
+      },
+    )
+
+    // Set up subscription for game history
+    channel.on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "game_history",
+      },
+      () => {
+        console.log("Game history updated")
+        toast({
+          title: "Game history updated",
+          description: "Game history has been updated in real-time",
+        })
+      },
+    )
+
+    // Set up subscription for teams
+    channel.on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "teams",
+      },
+      () => {
+        console.log("Teams updated")
+        toast({
+          title: "Teams updated",
+          description: "Team data has been updated in real-time",
+        })
+      },
+    )
+
+    // Listen for custom broadcasts
+    channel.on("broadcast", { event: "game_created" }, (payload) => {
+      console.log("Game created broadcast received:", payload)
       toast({
-        title: "Players updated",
-        description: "Player data has been updated in real-time",
+        title: "New game created",
+        description: "A new game has been created",
       })
     })
 
-    const gamesSubscription = subscribeToGames(() => {
-      toast({
-        title: "Games updated",
-        description: "Game data has been updated in real-time",
-      })
+    // Subscribe to the channel
+    channel.subscribe((status) => {
+      console.log("Channel subscription status:", status)
     })
 
-    const historySubscription = subscribeToGameHistory(() => {
-      toast({
-        title: "Game history updated",
-        description: "Game history has been updated in real-time",
-      })
-    })
-
-    const teamsSubscription = subscribeToTeams(() => {
-      toast({
-        title: "Teams updated",
-        description: "Team data has been updated in real-time",
-      })
-    })
-
-    // Cleanup subscriptions on unmount
+    // Cleanup subscription on unmount
     return () => {
-      playersSubscription.unsubscribe()
-      gamesSubscription.unsubscribe()
-      historySubscription.unsubscribe()
-      teamsSubscription.unsubscribe()
+      console.log("Cleaning up subscriptions...")
+      channel.unsubscribe()
     }
   }, [])
 
@@ -100,6 +159,9 @@ export default function Home() {
           </div>
         </div>
       </main>
+
+      {/* Add the debug panel */}
+      <DebugPanel />
     </div>
   )
 }
