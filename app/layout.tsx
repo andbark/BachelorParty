@@ -1,16 +1,9 @@
 import type React from "react"
-import type { Metadata } from "next"
-import { Inter } from "next/font/google"
-import { ThemeProvider } from "@/components/theme-provider"
-import { SiteHeader } from "@/components/site-header"
 import "./globals.css"
-import { Toaster } from "@/components/ui/toaster"
 
-const inter = Inter({ subsets: ["latin"] })
-
-export const metadata: Metadata = {
+export const metadata = {
   title: "Bachelor Party Tracker",
-  description: "Track games and money for the bachelor party",
+  description: "Track games and balances for your bachelor party",
 }
 
 export default function RootLayout({
@@ -19,16 +12,9 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <div className="relative flex min-h-screen flex-col">
-            <SiteHeader />
-            <main className="flex-1">{children}</main>
-          </div>
-        </ThemeProvider>
-        <Toaster />
-      </body>
+    <html lang="en">
+      <body>{children}</body>
     </html>
   )
 }
+
