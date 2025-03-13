@@ -305,3 +305,91 @@ export async function deleteGame(gameId: string) {
     return { success: false, error: 'Failed to delete game' }
   }
 }
+export async function joinGame(gameId: string, playerId: string) {
+  try {
+    const supabase = createClient()
+    
+    // First check if player is already in the game
+    const { data: existingPlayer } = await supabase
+      .from('game_players')
+      .select('*')
+      .eq('game_id', gameId)
+      .eq('player_id', playerId)
+      .single()
+
+    if (existingPlayer) {
+      return { error: 'Player is already in this game' }
+    }
+
+    // Get the game details to check the buy-in amount
+    const { data: game } = await supabase
+      .from('games')
+      .select('buy_in')
+      .eq('id', gameId)
+      .single()
+
+    if (!game) {
+      return { error: 'Game not found' }
+    }
+
+    // Get player's current balance
+    const { data: player } = await supabase
+      .from('players')
+      .select('balance')
+      .eq('id', playerId)
+      .single()
+
+    if (!player) {
+      return { error: 'Player not found' }
+    }
+
+    if (player.balance < game.buy_in) {
+      return { error: 'Insufficient balance' }
+    }
+
+    // Start a transaction
+    const { data: joinedGame, error: joinError } = await supabase
+      .from('game_players')
+      .insert([
+        {
+          game_id: gameId,
+          player_id: playerId,
+          current_balance: game.buy_in,
+          buy_in: game.buy_in
+        }
+      ])
+      .select()
+      .single()
+
+    if (joinError) {
+      console.error('Error joining game:', joinError)
+      return { error: 'Failed to join game' }
+    }
+
+    // Update player's balance
+    const { error: updateError } = await supabase
+      .from('players')
+      .update({ 
+        balance: player.balance - game.buy_in 
+      })
+      .eq('id', playerId)
+
+    if (updateError) {
+      console.error('Error updating balance:', updateError)
+      // Rollback the game join if balance update fails
+      await supabase
+        .from('game_players')
+        .delete()
+        .eq('game_id', gameId)
+        .eq('player_id', playerId)
+      
+      return { error: 'Failed to update balance' }
+    }
+
+    revalidatePath('/')
+    return { success: true }
+  } catch (error) {
+    console.error('Join game error:', error)
+    return { error: 'An unexpected error occurred' }
+  }
+}
