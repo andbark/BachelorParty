@@ -1,114 +1,147 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
-import { supabase } from "@/lib/supabase"
+import { useState, useEffect } from "react"
+import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { useToast } from "@/hooks/use-toast"
+import { createClient } from "@/lib/supabase"
+import { User } from "lucide-react"
 
-interface Player {
+type Player = {
   id: string
   name: string
   balance: number
-  created_at: string
+  games_played: number
+  games_won: number
 }
 
 export default function PlayerBalances() {
   const [players, setPlayers] = useState<Player[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  // Find the player with the highest balance for progress bar calculation
-  const maxBalance = Math.max(...players.map((player) => player.balance), 300)
+  const [isAddPlayerOpen, setIsAddPlayerOpen] = useState(false)
+  const [newPlayerName, setNewPlayerName] = useState("")
+  const { toast } = useToast()
+  const supabase = createClient()
 
   useEffect(() => {
-    async function fetchPlayers() {
-      try {
-        setLoading(true)
-
-        const { data, error } = await supabase.from("players").select("*").order("balance", { ascending: false })
-
-        if (error) {
-          throw error
-        }
-
-        setPlayers(data || [])
-      } catch (error: any) {
-        console.error("Error fetching players:", error)
-        setError(`Failed to load players: ${error.message}`)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     fetchPlayers()
-
-    // Set up real-time subscription
-    const subscription = supabase
-      .channel("players-changes")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "players",
-        },
-        (payload) => {
-          if (payload.eventType === "INSERT") {
-            setPlayers((current) => [...current, payload.new as Player])
-          } else if (payload.eventType === "UPDATE") {
-            setPlayers((current) =>
-              current.map((player) => (player.id === payload.new.id ? (payload.new as Player) : player)),
-            )
-          } else if (payload.eventType === "DELETE") {
-            setPlayers((current) => current.filter((player) => player.id !== payload.old.id))
-          }
-        },
-      )
-      .subscribe()
-
-    return () => {
-      subscription.unsubscribe()
-    }
   }, [])
 
-  if (loading) {
-    return (
-      <Card>
-        <CardContent className="pt-6">Loading player balances...</CardContent>
-      </Card>
-    )
+  async function fetchPlayers() {
+    const { data, error } = await supabase.from("players").select("*")
+
+    if (error) {
+      toast({
+        title: "Error fetching players",
+        description: error.message,
+        variant: "destructive",
+      })
+      return
+    }
+
+    setPlayers(data || [])
   }
 
-  if (error) {
-    return (
-      <Card>
-        <CardContent className="pt-6 text-destructive">{error}</CardContent>
-      </Card>
-    )
+  async function addPlayer() {
+    if (!newPlayerName.trim()) {
+      toast({
+        title: "Invalid name",
+        description: "Please provide a player name",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const newPlayer = {
+      name: newPlayerName,
+      balance: 300, // Starting balance
+      games_played: 0,
+      games_won: 0,
+    }
+
+    const { data, error } = await supabase.from("players").insert([newPlayer]).select()
+
+    if (error) {
+      toast({
+        title: "Error adding player",
+        description: error.message,
+        variant: "destructive",
+      })
+      return
+    }
+
+    toast({
+      title: "Player added",
+      description: `${newPlayerName} has been added with $300`,
+    })
+
+    setNewPlayerName("")
+    setIsAddPlayerOpen(false)
+    fetchPlayers()
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Player Balances</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {players.length === 0 ? (
-          <p>No players found. Add players to get started.</p>
-        ) : (
-          <div className="space-y-4">
-            {players.map((player) => (
-              <div key={player.id} className="space-y-1">
-                <div className="flex justify-between">
-                  <span className="font-medium">{player.name}</span>
-                  <span className="font-mono">${player.balance}</span>
-                </div>
-                <Progress value={(player.balance / maxBalance) * 100} className="h-2 [&>div]:bg-green-500" />
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-2xl font-bold">Player Balances</h2>
+        <Dialog open={isAddPlayerOpen} onOpenChange={setIsAddPlayerOpen}>
+          <DialogTrigger asChild>
+            <Button>Add Player</Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New Player</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="player-name">Player Name</Label>
+                <Input
+                  id="player-name"
+                  value={newPlayerName}
+                  onChange={(e) => setNewPlayerName(e.target.value)}
+                  placeholder="Enter player name"
+                />
               </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+              <Button onClick={addPlayer} className="w-full">
+                Add Player
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {players.map((player) => (
+          <Card key={player.id}>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2 mb-2">
+                <User className="h-5 w-5" />
+                <h3 className="font-medium">{player.name}</h3>
+              </div>
+              <div className="space-y-2">
+                <div>
+                  <p className="text-sm text-muted-foreground">Balance</p>
+                  <p className="text-2xl font-bold">${player.balance}</p>
+                </div>
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <p>Games Played: {player.games_played}</p>
+                  <p>Games Won: {player.games_won}</p>
+                </div>
+                <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+                  <div
+                    className="bg-primary h-full"
+                    style={{
+                      width: `${player.games_played > 0 ? (player.games_won / player.games_played) * 100 : 0}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
   )
 }
