@@ -2,22 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase"
-import { Edit, Trash2 } from "lucide-react"
 
 type Player = {
   id: string
@@ -137,6 +123,8 @@ export default function PlayerManager() {
 
   return (
     <div className="space-y-4">
+      <Button onClick={fetchPlayers}>Refresh Players</Button>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {players.map((player) => (
           <div key={player.id} className="flex items-center justify-between p-4 border rounded-lg">
@@ -148,6 +136,7 @@ export default function PlayerManager() {
               </p>
             </div>
             <div className="flex space-x-2">
+              {/*
               <Button
                 variant="outline"
                 size="icon"
@@ -169,12 +158,14 @@ export default function PlayerManager() {
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
+              */}
             </div>
           </div>
         ))}
       </div>
 
       {/* Edit Player Dialog */}
+      {/*
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -209,8 +200,10 @@ export default function PlayerManager() {
           )}
         </DialogContent>
       </Dialog>
+      */}
 
       {/* Delete Player Confirmation */}
+      {/*
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -227,6 +220,7 @@ export default function PlayerManager() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      */}
     </div>
   )
 }
