@@ -50,6 +50,32 @@ export default function GameManager() {
 
   useEffect(() => {
     fetchGames()
+
+    // Subscribe to real-time updates
+    const channel = supabase.channel("custom-all-channel")
+
+    channel
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "games",
+        },
+        () => {
+          console.log("Games table changed, refreshing...")
+          fetchGames()
+        },
+      )
+      .on("broadcast", { event: "game_created" }, () => {
+        console.log("New game created, refreshing...")
+        fetchGames()
+      })
+      .subscribe()
+
+    return () => {
+      channel.unsubscribe()
+    }
   }, [])
 
   async function fetchGames() {
@@ -191,26 +217,30 @@ export default function GameManager() {
   async function deleteGame() {
     if (!gameToDelete) return
 
-    // Start a transaction
-    const { error: transactionError } = await supabase.rpc("begin_transaction")
-    if (transactionError) {
-      toast({
-        title: "Transaction error",
-        description: transactionError.message,
-        variant: "destructive",
-      })
-      return
-    }
-
     try {
-      // Delete game players
-      await supabase.from("game_players").delete().eq("game_id", gameToDelete.id)
+      // Delete game players first
+      const { error: playersError } = await supabase.from("game_players").delete().eq("game_id", gameToDelete.id)
 
-      // Delete the game
-      await supabase.from("games").delete().eq("id", gameToDelete.id)
+      if (playersError) {
+        toast({
+          title: "Error deleting game players",
+          description: playersError.message,
+          variant: "destructive",
+        })
+        return
+      }
 
-      // Commit transaction
-      await supabase.rpc("commit_transaction")
+      // Then delete the game
+      const { error: gameError } = await supabase.from("games").delete().eq("id", gameToDelete.id)
+
+      if (gameError) {
+        toast({
+          title: "Error deleting game",
+          description: gameError.message,
+          variant: "destructive",
+        })
+        return
+      }
 
       toast({
         title: "Game deleted",
@@ -220,9 +250,6 @@ export default function GameManager() {
       setIsDeleteDialogOpen(false)
       fetchGames()
     } catch (error) {
-      // Rollback transaction on error
-      await supabase.rpc("rollback_transaction")
-
       toast({
         title: "Error deleting game",
         description: error instanceof Error ? error.message : "Unknown error occurred",
