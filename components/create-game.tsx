@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
@@ -30,6 +30,13 @@ type Team = {
   members: string[]
 }
 
+type TeamFormation = {
+  id: string
+  name: string
+  players: string[]
+  wager: number
+}
+
 export default function CreateGame() {
   const [isOpen, setIsOpen] = useState(false)
   const [isNewGameTypeOpen, setIsNewGameTypeOpen] = useState(false)
@@ -43,6 +50,11 @@ export default function CreateGame() {
   const [selectedTeams, setSelectedTeams] = useState<{ id: string; wager: number }[]>([])
   const { toast } = useToast()
   const supabase = createClient()
+  const [teamFormations, setTeamFormations] = useState<TeamFormation[]>([
+    { id: "1", name: "Team 1", players: [], wager: 0 },
+    { id: "2", name: "Team 2", players: [], wager: 0 },
+  ])
+  const [availablePlayers, setAvailablePlayers] = useState<Player[]>([])
 
   useEffect(() => {
     fetchGameTypes()
@@ -159,6 +171,35 @@ export default function CreateGame() {
     setSelectedTeams(selectedTeams.map((t) => (t.id === teamId ? { ...t, wager } : t)))
   }
 
+  function addNewTeam() {
+    const newTeamNumber = teamFormations.length + 1
+    setTeamFormations([
+      ...teamFormations,
+      { id: String(newTeamNumber), name: `Team ${newTeamNumber}`, players: [], wager: 0 },
+    ])
+  }
+
+  // Add this function to handle player assignment to teams
+  function assignPlayerToTeam(playerId: string, teamId: string) {
+    // Remove player from any existing team
+    const updatedTeams = teamFormations.map((team) => ({
+      ...team,
+      players: team.players.filter((id) => id !== playerId),
+    }))
+
+    // Add player to selected team
+    const finalTeams = updatedTeams.map((team) =>
+      team.id === teamId ? { ...team, players: [...team.players, playerId] } : team,
+    )
+
+    setTeamFormations(finalTeams)
+  }
+
+  // Add this function to update team wager
+  function updateTeamFormationWager(teamId: string, wager: number) {
+    setTeamFormations((teams) => teams.map((team) => (team.id === teamId ? { ...team, wager } : team)))
+  }
+
   async function createGame() {
     if (!selectedGameType) {
       toast({
@@ -169,22 +210,16 @@ export default function CreateGame() {
       return
     }
 
-    if (isTeamGame && selectedTeams.length < 2) {
-      toast({
-        title: "Not enough teams",
-        description: "Please select at least 2 teams",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (!isTeamGame && selectedPlayers.length < 2) {
-      toast({
-        title: "Not enough players",
-        description: "Please select at least 2 players",
-        variant: "destructive",
-      })
-      return
+    if (isTeamGame) {
+      const teamsWithPlayers = teamFormations.filter((team) => team.players.length > 0)
+      if (teamsWithPlayers.length < 2) {
+        toast({
+          title: "Not enough teams",
+          description: "Please select at least 2 teams with players",
+          variant: "destructive",
+        })
+        return
+      }
     }
 
     // Create the game in the database
@@ -213,14 +248,19 @@ export default function CreateGame() {
 
     // Add participants to the game
     if (isTeamGame) {
-      for (const team of selectedTeams) {
-        await supabase.from("game_teams").insert([
-          {
-            game_id: gameId,
-            team_id: team.id,
-            wager: team.wager,
-          },
-        ])
+      for (const team of teamFormations) {
+        if (team.players.length > 0) {
+          for (const playerId of team.players) {
+            await supabase.from("game_players").insert([
+              {
+                game_id: gameId,
+                player_id: playerId,
+                wager: team.wager,
+                team_id: team.id,
+              },
+            ])
+          }
+        }
       }
     } else {
       for (const player of selectedPlayers) {
@@ -263,6 +303,7 @@ export default function CreateGame() {
             <DialogTitle>Create a New Game</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Game Type Selection remains the same */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="game-type">Game Type</Label>
@@ -298,36 +339,59 @@ export default function CreateGame() {
             </div>
 
             {isTeamGame ? (
-              <div>
-                <Label>Select Teams</Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                  {teams.map((team) => (
-                    <Card key={team.id} className={selectedTeams.some((t) => t.id === team.id) ? "border-primary" : ""}>
-                      <CardHeader className="p-3">
-                        <CardTitle className="text-base flex justify-between">
-                          <Button
-                            variant="ghost"
-                            className="p-0 h-auto font-normal justify-start"
-                            onClick={() => toggleTeam(team.id)}
-                          >
-                            {team.name}
-                          </Button>
-                          {selectedTeams.some((t) => t.id === team.id) && (
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <Label>Teams</Label>
+                  <Button variant="outline" size="sm" onClick={addNewTeam}>
+                    Add Team
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {teamFormations.map((team) => (
+                    <Card key={team.id}>
+                      <CardHeader className="p-4">
+                        <CardTitle className="text-lg flex justify-between items-center">
+                          {team.name}
+                          <div className="flex items-center space-x-2">
+                            <Label htmlFor={`team-${team.id}-wager`} className="text-sm">
+                              Wager: $
+                            </Label>
                             <Input
+                              id={`team-${team.id}-wager`}
                               type="number"
-                              className="w-24 h-8"
-                              placeholder="Wager"
-                              value={selectedTeams.find((t) => t.id === team.id)?.wager || 0}
-                              onChange={(e) => updateTeamWager(team.id, Number(e.target.value))}
+                              className="w-20 h-8"
+                              placeholder="0"
+                              value={team.wager || ""}
+                              onChange={(e) => updateTeamFormationWager(team.id, Number(e.target.value))}
                             />
-                          )}
+                          </div>
                         </CardTitle>
                       </CardHeader>
+                      <CardContent className="p-4 pt-0">
+                        <Label>Select Players</Label>
+                        <div className="grid grid-cols-2 gap-2 mt-2">
+                          {players.map((player) => (
+                            <Button
+                              key={player.id}
+                              variant={team.players.includes(player.id) ? "default" : "outline"}
+                              className="justify-start"
+                              onClick={() => assignPlayerToTeam(player.id, team.id)}
+                              disabled={
+                                !team.players.includes(player.id) &&
+                                teamFormations.some((t) => t.players.includes(player.id))
+                              }
+                            >
+                              {player.name} (${player.balance})
+                            </Button>
+                          ))}
+                        </div>
+                      </CardContent>
                     </Card>
                   ))}
                 </div>
               </div>
             ) : (
+              // Individual player selection remains the same
               <div>
                 <Label>Select Players</Label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
@@ -346,13 +410,19 @@ export default function CreateGame() {
                             {player.name} (${player.balance})
                           </Button>
                           {selectedPlayers.some((p) => p.id === player.id) && (
-                            <Input
-                              type="number"
-                              className="w-24 h-8"
-                              placeholder="Wager"
-                              value={selectedPlayers.find((p) => p.id === player.id)?.wager || 0}
-                              onChange={(e) => updatePlayerWager(player.id, Number(e.target.value))}
-                            />
+                            <div className="flex items-center space-x-2">
+                              <Label htmlFor={`player-${player.id}-wager`} className="text-sm">
+                                Wager: $
+                              </Label>
+                              <Input
+                                id={`player-${player.id}-wager`}
+                                type="number"
+                                className="w-20 h-8"
+                                placeholder="0"
+                                value={selectedPlayers.find((p) => p.id === player.id)?.wager || 0}
+                                onChange={(e) => updatePlayerWager(player.id, Number(e.target.value))}
+                              />
+                            </div>
                           )}
                         </CardTitle>
                       </CardHeader>
@@ -372,7 +442,7 @@ export default function CreateGame() {
         </DialogContent>
       </Dialog>
 
-      {/* New Game Type Dialog */}
+      {/* New Game Type Dialog remains the same */}
       <Dialog open={isNewGameTypeOpen} onOpenChange={setIsNewGameTypeOpen}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
