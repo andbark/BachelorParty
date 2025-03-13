@@ -4,6 +4,39 @@ export type RealtimeSubscription = {
   unsubscribe: () => void
 }
 
+export function subscribeToGames(callback: () => void): RealtimeSubscription {
+  const supabase = createClient()
+
+  const channel = supabase
+    .channel("games-changes")
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "games",
+      },
+      () => {
+        console.log("Games table changed")
+        callback()
+      },
+    )
+    .on("broadcast", { event: "game_created" }, (payload) => {
+      console.log("New game created broadcast received:", payload)
+      callback()
+    })
+    .subscribe((status) => {
+      console.log("Games subscription status:", status)
+    })
+
+  return {
+    unsubscribe: () => {
+      console.log("Unsubscribing from games channel")
+      channel.unsubscribe()
+    },
+  }
+}
+
 export function subscribeToPlayers(callback: () => void): RealtimeSubscription {
   const supabase = createClient()
 
@@ -15,31 +48,6 @@ export function subscribeToPlayers(callback: () => void): RealtimeSubscription {
         event: "*",
         schema: "public",
         table: "players",
-      },
-      () => {
-        callback()
-      },
-    )
-    .subscribe()
-
-  return {
-    unsubscribe: () => {
-      subscription.unsubscribe()
-    },
-  }
-}
-
-export function subscribeToGames(callback: () => void): RealtimeSubscription {
-  const supabase = createClient()
-
-  const subscription = supabase
-    .channel("games-changes")
-    .on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "games",
       },
       () => {
         callback()
@@ -103,4 +111,3 @@ export function subscribeToTeams(callback: () => void): RealtimeSubscription {
     },
   }
 }
-
