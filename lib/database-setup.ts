@@ -52,9 +52,10 @@ export async function setupDatabase() {
     sql: `
       CREATE TABLE IF NOT EXISTS game_players (
         id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-        game_id UUID REFERENCES games(id),
+        game_id UUID REFERENCES games(id) ON DELETE CASCADE,
         player_id UUID REFERENCES players(id),
         wager NUMERIC DEFAULT 0,
+        team_id TEXT,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
       );
     `,
@@ -66,7 +67,7 @@ export async function setupDatabase() {
     sql: `
       CREATE TABLE IF NOT EXISTS game_teams (
         id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-        game_id UUID REFERENCES games(id),
+        game_id UUID REFERENCES games(id) ON DELETE CASCADE,
         team_id UUID REFERENCES teams(id),
         wager NUMERIC DEFAULT 0,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
@@ -80,7 +81,7 @@ export async function setupDatabase() {
     sql: `
       CREATE TABLE IF NOT EXISTS game_history (
         id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-        game_id UUID REFERENCES games(id),
+        game_id UUID,
         game_type TEXT NOT NULL,
         winner_id TEXT NOT NULL,
         winner_name TEXT NOT NULL,
