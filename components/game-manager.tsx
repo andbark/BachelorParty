@@ -17,13 +17,13 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase"
-import { Edit, Trash2 } from "lucide-react"
+import { Edit, Trash2, RefreshCw } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 
 type Game = {
   id: string
   type: string
-  is_team_game: boolean
+  is_team_game?: boolean
   status: string
   created_at: string
 }
@@ -44,6 +44,7 @@ export default function GameManager() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [gameToDelete, setGameToDelete] = useState<Game | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
   const supabase = createClient()
 
@@ -52,22 +53,35 @@ export default function GameManager() {
   }, [])
 
   async function fetchGames() {
-    const { data, error } = await supabase
-      .from("games")
-      .select("*")
-      .eq("status", "in_progress")
-      .order("created_at", { ascending: false })
+    setIsLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from("games")
+        .select("*")
+        .eq("status", "in_progress")
+        .order("created_at", { ascending: false })
 
-    if (error) {
+      if (error) {
+        toast({
+          title: "Error fetching games",
+          description: error.message,
+          variant: "destructive",
+        })
+        return
+      }
+
+      console.log("Active games:", data)
+      setGames(data || [])
+    } catch (error) {
+      console.error("Error fetching games:", error)
       toast({
         title: "Error fetching games",
-        description: error.message,
+        description: "An unexpected error occurred",
         variant: "destructive",
       })
-      return
+    } finally {
+      setIsLoading(false)
     }
-
-    setGames(data || [])
   }
 
   async function fetchGamePlayers(gameId: string) {
@@ -105,34 +119,57 @@ export default function GameManager() {
     setGamePlayers(formattedPlayers)
   }
 
+  // Determine if a game is a team game based on players having team_id
+  function isGameTeamGame(gameId: string): boolean {
+    // If the game has is_team_game property, use it
+    const game = games.find((g) => g.id === gameId)
+    if (game && typeof game.is_team_game === "boolean") {
+      return game.is_team_game
+    }
+
+    // Otherwise check if any players have team_id
+    return gamePlayers.some((player) => player.game_id === gameId && player.team_id)
+  }
+
   async function updateGame() {
     if (!editingGame) return
 
-    const { data, error } = await supabase
-      .from("games")
-      .update({
+    try {
+      const updateData: any = {
         type: editingGame.type,
-        is_team_game: editingGame.is_team_game,
-      })
-      .eq("id", editingGame.id)
-      .select()
+      }
 
-    if (error) {
+      // Only include is_team_game if it exists in the original game object
+      if (typeof editingGame.is_team_game === "boolean") {
+        updateData.is_team_game = editingGame.is_team_game
+      }
+
+      const { data, error } = await supabase.from("games").update(updateData).eq("id", editingGame.id).select()
+
+      if (error) {
+        toast({
+          title: "Error updating game",
+          description: error.message,
+          variant: "destructive",
+        })
+        return
+      }
+
+      toast({
+        title: "Game updated",
+        description: `Game has been updated successfully`,
+      })
+
+      setIsEditDialogOpen(false)
+      fetchGames()
+    } catch (error) {
+      console.error("Error updating game:", error)
       toast({
         title: "Error updating game",
-        description: error.message,
+        description: "An unexpected error occurred",
         variant: "destructive",
       })
-      return
     }
-
-    toast({
-      title: "Game updated",
-      description: `Game has been updated successfully`,
-    })
-
-    setIsEditDialogOpen(false)
-    fetchGames()
   }
 
   async function updatePlayerWager(playerId: string, wager: number) {
@@ -201,7 +238,17 @@ export default function GameManager() {
 
   return (
     <div className="space-y-4">
-      {games.length === 0 ? (
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-medium">Active Games</h3>
+        <Button variant="outline" size="sm" onClick={fetchGames} disabled={isLoading}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="text-center py-4">Loading games...</div>
+      ) : games.length === 0 ? (
         <p className="text-center text-muted-foreground py-4">No active games found</p>
       ) : (
         <div className="grid grid-cols-1 gap-4">
@@ -264,7 +311,7 @@ export default function GameManager() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="team-game"
-                      checked={editingGame.is_team_game}
+                      checked={editingGame.is_team_game || isGameTeamGame(editingGame.id)}
                       onCheckedChange={(checked) => setEditingGame({ ...editingGame, is_team_game: checked === true })}
                       disabled={true} // Can't change team status after creation
                     />
