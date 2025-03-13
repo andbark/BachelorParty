@@ -137,3 +137,78 @@ export function GamesList({ games = [] }: GamesListProps) {
     </div>
   )
 }
+// Add these imports at the top of your file
+import { EditGameDialog } from "./edit-game-dialog"
+import { deleteGame } from "@/app/actions"
+import { toast } from "@/components/ui/use-toast"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { Trash2, Pencil } from 'lucide-react'
+
+// Add this function inside your component before the return statement
+async function handleDelete(gameId: string) {
+  try {
+    const result = await deleteGame(gameId)
+    
+    if (result.success) {
+      toast({
+        title: "Game deleted",
+        description: "The game has been deleted successfully.",
+      })
+    } else {
+      toast({
+        title: "Error",
+        description: result.error || "Failed to delete game",
+        variant: "destructive",
+      })
+    }
+  } catch (error) {
+    toast({
+      title: "Error",
+      description: "An unexpected error occurred",
+      variant: "destructive",
+    })
+  }
+}
+
+// In your existing card rendering, add the edit and delete buttons
+// Look for where you render each game card and add this inside the card header:
+<div className="flex items-center justify-between">
+  <CardTitle>{game.name}</CardTitle>
+  <div className="flex items-center space-x-2">
+    <EditGameDialog game={game} />
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <Button variant="outline" size="icon">
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Game</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to delete this game? This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => handleDelete(game.id)}
+            className="bg-red-600 hover:bg-red-700"
+          >
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </div>
+</div>
