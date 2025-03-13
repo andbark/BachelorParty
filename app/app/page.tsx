@@ -1,5 +1,5 @@
-import { Leaderboard } from "@/components/leaderboard"
-import { PlayerBalances } from "@/components/player-balances"
+import { Leaderboard } from "../components/leaderboard"
+import { PlayerBalances } from "../components/player-balances"
 
 export default function Page() {
   return (
